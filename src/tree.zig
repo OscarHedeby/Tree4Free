@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const meta = std.meta;
 
 const zbgfx = @import("zbgfx");
@@ -50,49 +51,82 @@ const Tree = struct {
     }
 };
 
-pub fn generateTree(alloc: std.mem.Allocator) !Tree {
+fn packU16To2Bytes(value: u16) [2]u8 {
+    const bits: u16 = @bitCast(value);
+    return .{
+        @intCast(bits >> 8), // high byte
+        @intCast(bits & 0xFF), // low  byte
+    };
+}
+
+fn packF16To2Bytes(value: f16) [2]u8 {
+    const bits: u16 = @bitCast(value);
+    return .{
+        @intCast(bits >> 8), // high byte
+        @intCast(bits & 0xFF), // low  byte
+    };
+}
+
+pub const TreeSettings = struct {
+    segments: usize,
+    radius: f32,
+    heightStep: f32,
+
+    pub fn strEncode(self: TreeSettings) [6]u8 {
+        return packU16To2Bytes(@intCast(self.segments)) ++
+            packF16To2Bytes(@floatCast(self.radius)) ++
+            packF16To2Bytes(@floatCast(self.heightStep));
+    }
+};
+
+pub fn generateTree(settings: TreeSettings, alloc: std.mem.Allocator) !Tree {
     const n_points = 8;
-    const num_verts = n_points * 2;
-    const num_indices = n_points * 6;
+    const num_verts = n_points * settings.segments;
+    const num_indices = (settings.segments - 1) * n_points * 6;
 
     var w_verts = try alloc.alloc(PosColorVertex, num_verts);
-    var w_indicies = try alloc.alloc(u16, num_indices);
+    var w_indices = try alloc.alloc(u16, num_indices);
 
     const ring = try alloc.alloc(PosColorVertex, n_points);
     defer alloc.free(ring);
-    const ring_radius = 1.0;
 
-    try genCircle(ring, ring_radius, Vec3f{ 0, 0, 0 });
-    // Copy the ring vertices to the tree vertices
-    for (0..n_points) |i| {
-        w_verts[i] = ring[i];
-    }
-    try genCircle(ring, ring_radius, Vec3f{ 0, 0, 4 });
-    // Copy the ring vertices to the tree vertices
-    for (n_points..n_points * 2) |i| {
-        w_verts[i] = ring[i - n_points];
-    }
-
-    // Generate the indices for the tree trunk
-    for (0..n_points) |i| {
-        const next = if (i + 1 == n_points) 0 else i + 1;
-        w_indicies[i * 6 + 0] = @intCast(i);
-        w_indicies[i * 6 + 1] = @intCast(next);
-        w_indicies[i * 6 + 2] = @intCast(i + n_points);
-
-        w_indicies[i * 6 + 3] = @intCast(i + n_points);
-        w_indicies[i * 6 + 4] = @intCast(next);
-        w_indicies[i * 6 + 5] = @intCast(next + n_points);
+    // Generate each ring along the height
+    for (0..settings.segments) |seg| {
+        const offset = Vec3f{
+            0,
+            @as(f32, @floatFromInt(seg)) * settings.heightStep,
+            0,
+        };
+        try genCircle(ring, settings.radius, offset);
+        for (0..n_points) |i| {
+            w_verts[seg * n_points + i] = ring[i];
+        }
     }
 
-    // Copy the vertices and indices to the tree
-    const tree = Tree{
-        .alloc = alloc,
-        .verts = w_verts,
-        .indices = w_indicies,
-    };
+    // Generate indices to connect rings
+    var idx_pos: usize = 0;
+    for (0..settings.segments - 1) |seg| {
+        const base0 = seg * n_points;
+        const base1 = (seg + 1) * n_points;
+        for (0..n_points) |i| {
+            const next = if (i + 1 == n_points) 0 else i + 1;
+            w_indices[idx_pos] = @intCast(base0 + i);
+            idx_pos += 1;
+            w_indices[idx_pos] = @intCast(base0 + next);
+            idx_pos += 1;
+            w_indices[idx_pos] = @intCast(base1 + i);
+            idx_pos += 1;
 
-    return tree;
+            w_indices[idx_pos] = @intCast(base1 + i);
+            idx_pos += 1;
+            w_indices[idx_pos] = @intCast(base0 + next);
+            idx_pos += 1;
+            w_indices[idx_pos] = @intCast(base1 + next);
+            idx_pos += 1;
+        }
+    }
+
+    return Tree{ .alloc = alloc, .verts = w_verts, .indices = w_indices };
 }
 
 const TreeGenError = error{
@@ -115,8 +149,8 @@ pub fn genCircle(
         const y = radius * std.math.sin(theta);
         verts[i] = PosColorVertex.init(
             x + vector_offset[0],
-            y + vector_offset[1],
-            vector_offset[2],
+            vector_offset[1],
+            y + vector_offset[2],
             center.abgr,
         );
     }

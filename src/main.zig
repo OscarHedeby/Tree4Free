@@ -92,6 +92,24 @@ var last_r = zglfw.Action.release;
 var old_flags = bgfx.ResetFlags_None;
 var old_size = [2]i32{ WIDTH, HEIGHT };
 
+// Initial Camera state
+const initial_eye_x: f32 = 10.0;
+const initial_eye_y: f32 = 0.0;
+const initial_eye_z: f32 = 0.0;
+const initial_target_x: f32 = 0.0;
+const initial_target_y: f32 = 0.0;
+const initial_target_z: f32 = 0.0;
+
+// Camera view direction (fixed)
+const dir_x = initial_target_x - initial_eye_x;
+const dir_y = initial_target_y - initial_eye_y;
+const dir_z = initial_target_z - initial_eye_z;
+
+// Current Camera position variables (controlled by sliders)
+var eye_x: f32 = initial_eye_x;
+var eye_y: f32 = initial_eye_y;
+var eye_z: f32 = initial_eye_z;
+
 pub fn main() anyerror!u8 {
     // Init zglfw
     try zglfw.init();
@@ -148,7 +166,14 @@ pub fn main() anyerror!u8 {
     const allocator = gpa_tree.allocator();
     defer _ = gpa_tree.deinit();
 
-    const tree = try TreeGen.generateTree(allocator);
+    const settings = TreeGen.TreeSettings{
+        .segments = 5,
+        .radius = 1.0,
+        .heightStep = 1.0,
+    };
+    const settings_str = settings.strEncode();
+    std.debug.print("Settings: {s}\n", .{settings_str});
+    const tree = try TreeGen.generateTree(settings, allocator);
     defer tree.deinit();
 
     //
@@ -263,11 +288,7 @@ pub fn main() anyerror!u8 {
     //
     // Create view and proj matrices
     //
-    const viewMtx = zm.lookAtRh(
-        zm.f32x4(10.0, 0.0, 0.0, 1.0),
-        zm.f32x4(0.0, 0.0, 0.0, 1.0),
-        zm.f32x4(0.0, 1.0, 0.0, 0.0),
-    );
+    var viewMtx: zm.Mat = undefined; // Will be updated in the loop
     var projMtx: zm.Mat = undefined;
 
     // Initialize projection matrix before first frame
@@ -374,6 +395,19 @@ pub fn main() anyerror!u8 {
         //
         //  Preapare view
         //
+        // Calculate current target based on eye and fixed direction
+        const target_x = eye_x + dir_x;
+        const target_y = eye_y + dir_y;
+        const target_z = eye_z + dir_z;
+        // Update view matrix based on eye variables
+        viewMtx = zm.lookAtRh(
+            // Use variables here
+            zm.f32x4(eye_x, eye_y, eye_z, 1.0),
+            // Use calculated target
+            zm.f32x4(target_x, target_y, target_z, 1.0),
+            zm.f32x4(0.0, 1.0, 0.0, 0.0),
+        );
+
         bgfx.setViewTransform(
             0,
             &zm.matToArr(viewMtx),
@@ -459,7 +493,25 @@ pub fn main() anyerror!u8 {
             @intCast(size[0]),
             @intCast(size[1]),
         );
-        zgui.showDemoWindow(null);
+        // zgui.showDemoWindow(null); // Optionally keep or remove demo window
+
+        // Add Camera Control Window
+        if (zgui.begin("Camera Controls", .{})) {
+            _ = zgui.sliderFloat(
+                "Eye X",
+                .{ .v = &eye_x, .min = -100.0, .max = 100.0 },
+            );
+            _ = zgui.sliderFloat(
+                "Eye Y",
+                .{ .v = &eye_y, .min = -100.0, .max = 100.0 },
+            );
+            _ = zgui.sliderFloat(
+                "Eye Z",
+                .{ .v = &eye_z, .min = -100.0, .max = 100.0 },
+            );
+        }
+        zgui.end();
+
         backend_glfw_bgfx.draw();
 
         // Render Frame
