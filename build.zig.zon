@@ -1,0 +1,28 @@
+.{
+    .name = .examples,
+    .fingerprint = 0x7bd0ad45636a9f2b,
+    .version = "0.1.0",
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+    },
+
+    .dependencies = .{
+        .zbgfx = .{ .path = "./deps/zbgfx" },
+
+        .zglfw = .{
+            .url = "https://github.com/zig-gamedev/zglfw/archive/dcb1dae7d4a90f88b70dbae73300ab9b19fb250c.tar.gz",
+            .hash = "zglfw-0.10.0-dev-zgVDNJmZIQCIiO_94Sp5jqrPtz4Eumk3bDcxS7dSZfIj",
+        },
+
+        .zgui = .{
+            .url = "https://github.com/zig-gamedev/zgui/archive/020b27ef9356abbecceb9e32103b79d4798a7b4a.tar.gz",
+            .hash = "zgui-0.6.0-dev--L6sZMGHaAB-y1HhtLJ3CXhfoMOOi4RAJDdnr_IGYKoh",
+        },
+
+        .zmath = .{
+            .url = "https://github.com/zig-gamedev/zmath/archive/ccf7297ef6c01e21b2d51ad81b5b6ce929e86a00.tar.gz",
+            .hash = "zmath-0.11.0-dev-wjwivZY1AwDO7yxNmZ5HWoU03f9mFBet8LN9-oYc3i29",
+        },
+    },
+}
