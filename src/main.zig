@@ -24,65 +24,6 @@ var bgfx_clbs = zbgfx.callbacks.CCallbackInterfaceT{
 };
 var bgfx_alloc: zbgfx.callbacks.ZigAllocator = undefined;
 
-//
-// Vertex layout definiton
-//
-const PosColorVertex = struct {
-    x: f32,
-    y: f32,
-    z: f32,
-    abgr: u32,
-
-    fn init(x: f32, y: f32, z: f32, abgr: u32) PosColorVertex {
-        return .{
-            .x = x,
-            .y = y,
-            .z = z,
-            .abgr = abgr,
-        };
-    }
-
-    fn layoutInit() bgfx.VertexLayout {
-        // static local
-        const L = struct {
-            var posColorLayout = std.mem.zeroes(bgfx.VertexLayout);
-        };
-
-        L.posColorLayout.begin(bgfx.RendererType.Noop)
-            .add(bgfx.Attrib.Position, 3, bgfx.AttribType.Float, false, false)
-            .add(bgfx.Attrib.Color0, 4, bgfx.AttribType.Uint8, true, false)
-            .end();
-
-        return L.posColorLayout;
-    }
-};
-
-const cube_vertices = [_]PosColorVertex{
-    PosColorVertex.init(-1.0, 1.0, 1.0, 0xff000000),
-    PosColorVertex.init(1.0, 1.0, 1.0, 0xff0000ff),
-    PosColorVertex.init(-1.0, -1.0, 1.0, 0xff00ff00),
-    PosColorVertex.init(1.0, -1.0, 1.0, 0xff00ffff),
-    PosColorVertex.init(-1.0, 1.0, -1.0, 0xffff0000),
-    PosColorVertex.init(1.0, 1.0, -1.0, 0xffff00ff),
-    PosColorVertex.init(-1.0, -1.0, -1.0, 0xffffff00),
-    PosColorVertex.init(1.0, -1.0, -1.0, 0xffffffff),
-};
-
-const cube_tri_list = [_]u16{
-    0, 1, 2, // 0
-    1, 3, 2,
-    4, 6, 5, // 2
-    5, 6, 7,
-    0, 2, 4, // 4
-    4, 2, 6,
-    1, 5, 3, // 6
-    5, 7, 3,
-    0, 4, 1, // 8
-    4, 5, 1,
-    2, 3, 6, // 10
-    6, 3, 7,
-};
-
 var debug = true;
 var vsync = true;
 
@@ -185,11 +126,11 @@ pub fn main() anyerror!u8 {
     //
     // Create vertex buffer
     //
-    const vertex_layout = PosColorVertex.layoutInit();
+    const vertex_layout = TreeGen.PosColorVertex.layoutInit();
     var vbh = bgfx.createVertexBuffer(
         bgfx.makeRef(
             tree.verts.ptr,
-            @intCast(tree.verts.len * @sizeOf(PosColorVertex)),
+            @intCast(tree.verts.len * @sizeOf(TreeGen.PosColorVertex)),
         ),
         &vertex_layout,
         bgfx.BufferFlags_None,
@@ -429,53 +370,6 @@ pub fn main() anyerror!u8 {
         bgfx.touch(0);
         bgfx.dbgTextClear(0, false);
 
-        //
-        //  Render cubes
-        //
-        // var yy: f32 = 0;
-        // const time: f32 = @as(
-        //     f32,
-        //     @floatFromInt(std.time.milliTimestamp() - start_time),
-        // ) / std.time.ms_per_s;
-        // while (yy < 11) : (yy += 1.0) {
-        //     var xx: f32 = 0;
-        //     while (xx < 11) : (xx += 1.0) {
-        //         const trans = zm.translation(
-        //             -15.0 + xx * 3.0,
-        //             -15 + yy * 3.0,
-        //             3.0 * @sin(3.0 * time + xx + yy),
-        //         );
-        //         const rotX = zm.rotationX(
-        //             @sin(1.5 * time) + xx * 0.21,
-        //         );
-        //         const rotY = zm.rotationY(
-        //             @sin(1.5 * time) + yy * 0.37,
-        //         );
-        //         const rotXY = zm.mul(rotX, rotY);
-        //         const modelMtx = zm.mul(rotXY, trans);
-
-        //         _ = bgfx.setTransform(&zm.matToArr(modelMtx), 1);
-        //         bgfx.setVertexBuffer(
-        //             0,
-        //             vbh,
-        //             0,
-        //             cube_vertices.len,
-        //         );
-        //         bgfx.setIndexBuffer(
-        //             ibh,
-        //             0,
-        //             cube_tri_list.len,
-        //         );
-        //         bgfx.setState(state, 0);
-        //         bgfx.submit(
-        //             0,
-        //             programHandle,
-        //             0,
-        //             255,
-        //         );
-        //     }
-        // }
-
         const trans = zm.translation(0.0, 0.0, 0.0);
         const rotX = zm.rotationX(0);
         const rotY = zm.rotationY(0);
@@ -566,7 +460,7 @@ pub fn main() anyerror!u8 {
             vbh = bgfx.createVertexBuffer(
                 bgfx.makeRef(
                     tree.verts.ptr,
-                    @intCast(tree.verts.len * @sizeOf(PosColorVertex)),
+                    @intCast(tree.verts.len * @sizeOf(TreeGen.PosColorVertex)),
                 ),
                 &vertex_layout,
                 bgfx.BufferFlags_None,

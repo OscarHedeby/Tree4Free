@@ -10,22 +10,36 @@ const Vec3f = @Vector(3, f32);
 //
 // Vertex layout definiton
 //
-const PosColorVertex = struct {
+pub const PosColorVertex = struct {
     x: f32,
     y: f32,
     z: f32,
+    nx: f32,
+    ny: f32,
+    nz: f32,
     abgr: u32,
 
-    fn init(x: f32, y: f32, z: f32, abgr: u32) PosColorVertex {
+    pub fn init(
+        x: f32,
+        y: f32,
+        z: f32,
+        nx: f32,
+        ny: f32,
+        nz: f32,
+        abgr: u32,
+    ) PosColorVertex {
         return .{
             .x = x,
             .y = y,
             .z = z,
+            .nx = nx,
+            .ny = ny,
+            .nz = nz,
             .abgr = abgr,
         };
     }
 
-    fn layoutInit() bgfx.VertexLayout {
+    pub fn layoutInit() bgfx.VertexLayout {
         // static local
         const L = struct {
             var posColorLayout = std.mem.zeroes(bgfx.VertexLayout);
@@ -33,6 +47,7 @@ const PosColorVertex = struct {
 
         L.posColorLayout.begin(bgfx.RendererType.Noop)
             .add(bgfx.Attrib.Position, 3, bgfx.AttribType.Float, false, false)
+            .add(bgfx.Attrib.Normal, 3, bgfx.AttribType.Float, true, false)
             .add(bgfx.Attrib.Color0, 4, bgfx.AttribType.Uint8, true, false)
             .end();
 
@@ -163,6 +178,9 @@ pub fn generateTree(profile: TreeProfile, alloc: std.mem.Allocator) !Tree {
         0,
         tip_y,
         0,
+        0,
+        1,
+        0,
         0xFFFFFFFF,
     );
     w_verts[n_points * (settings.segments + 1)] = tip_vertex;
@@ -225,16 +243,30 @@ pub fn genCircle(
     vector_offset: Vec3f,
 ) TreeGenError!void {
     const angle = 2.0 * std.math.pi / @as(f32, @floatFromInt(verts.len));
-    const center = PosColorVertex.init(0, 0, 0, 0xFFFFFFFF);
+    const center = PosColorVertex.init(0, 0, 0, 0, 0, 0, 0xFFFFFFFF);
+
+    var x: f32 = 0;
+    var y: f32 = 0;
+    var nx: f32 = 0;
+    var ny: f32 = 0;
+    var nz: f32 = 0;
 
     for (0..verts.len) |i| {
         const theta = @as(f32, @floatFromInt(i)) * angle;
-        const x = radius * std.math.cos(theta);
-        const y = radius * std.math.sin(theta);
+        x = radius * std.math.cos(theta);
+        y = radius * std.math.sin(theta);
+        // Compute normals
+        nx = std.math.cos(theta);
+        ny = std.math.sin(theta);
+        nz = 0.0;
+
         verts[i] = PosColorVertex.init(
             x + vector_offset[0],
             vector_offset[1],
             y + vector_offset[2],
+            nx,
+            ny,
+            nz,
             center.abgr,
         );
     }
