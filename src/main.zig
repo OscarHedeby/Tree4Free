@@ -162,25 +162,31 @@ pub fn main() anyerror!u8 {
 
     if (!bgfx.init(&bgfx_init)) std.process.exit(1);
     defer bgfx.shutdown();
+
+    var tree_height: f32 = 20.0;
+    var tree_thickness: f32 = 2.0;
+    var tree_taper: f32 = 1.0;
+    var tree_segment_height: f32 = 0.5;
+
     var gpa_tree = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa_tree.allocator();
     defer _ = gpa_tree.deinit();
 
-    const settings = TreeGen.TreeSettings{
-        .segments = 5,
-        .radius = 1.0,
-        .heightStep = 1.0,
+    var tree_profile = TreeGen.TreeProfile{
+        .height = tree_height,
+        .thickness = tree_thickness,
+        .taper = tree_taper,
+        .segment_height = tree_segment_height,
     };
-    const settings_str = settings.strEncode();
-    std.debug.print("Settings: {s}\n", .{settings_str});
-    const tree = try TreeGen.generateTree(settings, allocator);
+
+    var tree = try TreeGen.generateTree(tree_profile, allocator);
     defer tree.deinit();
 
     //
     // Create vertex buffer
     //
     const vertex_layout = PosColorVertex.layoutInit();
-    const vbh = bgfx.createVertexBuffer(
+    var vbh = bgfx.createVertexBuffer(
         bgfx.makeRef(
             tree.verts.ptr,
             @intCast(tree.verts.len * @sizeOf(PosColorVertex)),
@@ -193,7 +199,7 @@ pub fn main() anyerror!u8 {
     //
     // Create index buffer
     //
-    const ibh = bgfx.createIndexBuffer(
+    var ibh = bgfx.createIndexBuffer(
         bgfx.makeRef(
             tree.indices.ptr,
             @intCast(tree.indices.len * @sizeOf(u16)),
@@ -499,18 +505,80 @@ pub fn main() anyerror!u8 {
         if (zgui.begin("Camera Controls", .{})) {
             _ = zgui.sliderFloat(
                 "Eye X",
-                .{ .v = &eye_x, .min = -100.0, .max = 100.0 },
+                .{ .v = &eye_x, .min = -20.0, .max = 40.0 },
             );
             _ = zgui.sliderFloat(
                 "Eye Y",
-                .{ .v = &eye_y, .min = -100.0, .max = 100.0 },
+                .{ .v = &eye_y, .min = -20.0, .max = 40.0 },
             );
             _ = zgui.sliderFloat(
                 "Eye Z",
-                .{ .v = &eye_z, .min = -100.0, .max = 100.0 },
+                .{ .v = &eye_z, .min = -20.0, .max = 40.0 },
             );
         }
         zgui.end();
+
+        // Tree Profile Controls
+        var tree_changed = false;
+        if (zgui.begin("Tree Profile", .{})) {
+            tree_changed = tree_changed or
+                zgui.sliderFloat("Height", .{
+                    .v = &tree_height,
+                    .min = 1.0,
+                    .max = 50.0,
+                });
+            tree_changed = tree_changed or
+                zgui.sliderFloat("Thickness", .{
+                    .v = &tree_thickness,
+                    .min = 0.1,
+                    .max = 10.0,
+                });
+            tree_changed = tree_changed or
+                zgui.sliderFloat("Taper", .{
+                    .v = &tree_taper,
+                    .min = 0.5,
+                    .max = 3.0,
+                });
+            tree_changed = tree_changed or
+                zgui.sliderFloat("Segment Height", .{
+                    .v = &tree_segment_height,
+                    .min = 0.05,
+                    .max = 2.0,
+                });
+        }
+        zgui.end();
+
+        // Regenerate tree mesh if any parameter changed
+        if (tree_changed) {
+            tree.deinit();
+            tree_profile = TreeGen.TreeProfile{
+                .height = tree_height,
+                .thickness = tree_thickness,
+                .taper = tree_taper,
+                .segment_height = tree_segment_height,
+            };
+            tree = try TreeGen.generateTree(tree_profile, allocator);
+
+            // Re-upload vertex/index buffers
+            bgfx.destroyVertexBuffer(vbh);
+            bgfx.destroyIndexBuffer(ibh);
+
+            vbh = bgfx.createVertexBuffer(
+                bgfx.makeRef(
+                    tree.verts.ptr,
+                    @intCast(tree.verts.len * @sizeOf(PosColorVertex)),
+                ),
+                &vertex_layout,
+                bgfx.BufferFlags_None,
+            );
+            ibh = bgfx.createIndexBuffer(
+                bgfx.makeRef(
+                    tree.indices.ptr,
+                    @intCast(tree.indices.len * @sizeOf(u16)),
+                ),
+                bgfx.BufferFlags_None,
+            );
+        }
 
         backend_glfw_bgfx.draw();
 

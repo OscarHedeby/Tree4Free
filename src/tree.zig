@@ -67,24 +67,50 @@ fn packF16To2Bytes(value: f16) [2]u8 {
     };
 }
 
-pub const TreeSettings = struct {
-    segments: usize,
-    radius: f32,
-    heightStep: f32,
+pub const TreeProfile = struct {
+    height: f32,
+    thickness: f32,
+    taper: f32, // 1.0 = no taper, >1.0 = more bulge at base, <1.0 = sharper taper
+    segment_height: f32,
 
-    pub fn strEncode(self: TreeSettings) [6]u8 {
-        return packU16To2Bytes(@intCast(self.segments)) ++
-            packF16To2Bytes(@floatCast(self.radius)) ++
-            packF16To2Bytes(@floatCast(self.heightStep));
+    /// Returns the number of segments for the given height and segment_height
+    fn computeSegments(self: TreeProfile) usize {
+        return @max(2, @as(u32, @intFromFloat(@ceil(self.height / self.segment_height))));
+    }
+
+    /// Returns the TreeSettings for this profile
+    pub fn toSettings(self: TreeProfile) TreeSettings {
+        const segments = self.computeSegments();
+        return TreeSettings{
+            .segments = segments,
+            .radius = self.thickness,
+            .heightStep = self.height / @as(f32, @floatFromInt(segments - 1)),
+            .taper = self.taper,
+        };
     }
 };
 
-pub fn generateTree(settings: TreeSettings, alloc: std.mem.Allocator) !Tree {
+const TreeSettings = struct {
+    segments: usize,
+    radius: f32,
+    heightStep: f32,
+    taper: f32,
+
+    pub fn strEncode(self: TreeSettings) [8]u8 {
+        return packU16To2Bytes(@intCast(self.segments)) ++
+            packF16To2Bytes(@floatCast(self.radius)) ++
+            packF16To2Bytes(@floatCast(self.heightStep)) ++
+            packF16To2Bytes(@floatCast(self.taper));
+    }
+};
+
+pub fn generateTree(profile: TreeProfile, alloc: std.mem.Allocator) !Tree {
+    const settings = profile.toSettings();
     const n_points = 8;
-    // +1 for the cap vertex at the top
-    const num_verts = n_points * settings.segments + 1;
-    // indices for the sides + indices for the cap (n_points triangles)
-    const num_indices = (settings.segments - 1) * n_points * 6 + n_points * 3;
+    // +1 for the cap ring, +1 for the tip vertex
+    const num_verts = n_points * (settings.segments + 1) + 1;
+    // indices for the sides + indices for the tip (n_points triangles)
+    const num_indices = (settings.segments) * n_points * 6 + n_points * 3;
 
     var w_verts = try alloc.alloc(PosColorVertex, num_verts);
     var w_indices = try alloc.alloc(u16, num_indices);
@@ -93,13 +119,19 @@ pub fn generateTree(settings: TreeSettings, alloc: std.mem.Allocator) !Tree {
     defer alloc.free(ring);
 
     // Generate each ring along the height, with tapering radius
+    const base_scale: f32 = settings.taper; // base is taper x the given radius
+    const min_radius: f32 = settings.radius * 0.2;
     for (0..settings.segments) |seg| {
         const t = @as(f32, @floatFromInt(seg)) / @as(
             f32,
             @floatFromInt(settings.segments - 1),
         );
-        // Linear taper: radius decreases from base to top
-        const seg_radius = settings.radius * (1.0 - t);
+        // Tree trunk profile: thick at base, then slims down
+        // Cubic ease-out: (1-t)^2 * (1 - 0.5*t) gives a bulge at the base
+        // Instead of converging to 0, lerp to min_radius
+        const profile_shape = (1.0 - t) * (1.0 - t) * (1.0 - 0.5 * t);
+        const seg_radius = min_radius +
+            (base_scale * settings.radius - min_radius) * profile_shape;
         const offset = Vec3f{
             0,
             @as(f32, @floatFromInt(seg)) * settings.heightStep,
@@ -111,22 +143,26 @@ pub fn generateTree(settings: TreeSettings, alloc: std.mem.Allocator) !Tree {
         }
     }
 
-    // Add cap vertex at the top center
-    const cap_y = @as(
-        f32,
-        @floatFromInt(settings.segments - 1),
-    ) * settings.heightStep;
-    const cap_vertex = PosColorVertex.init(
+    // Add cap ring at the top (not part of segments)
+    const cap_ring_y = @as(f32, @floatFromInt(settings.segments)) * settings.heightStep;
+    try genCircle(ring, min_radius, Vec3f{ 0, cap_ring_y, 0 });
+    for (0..n_points) |i| {
+        w_verts[settings.segments * n_points + i] = ring[i];
+    }
+
+    // Add tip vertex above the cap ring
+    const tip_y = cap_ring_y + settings.heightStep * 0.5;
+    const tip_vertex = PosColorVertex.init(
         0,
-        cap_y,
+        tip_y,
         0,
         0xFFFFFFFF,
     );
-    w_verts[n_points * settings.segments] = cap_vertex;
+    w_verts[n_points * (settings.segments + 1)] = tip_vertex;
 
     // Generate indices to connect rings (sides)
     var idx_pos: usize = 0;
-    for (0..settings.segments - 1) |seg| {
+    for (0..settings.segments) |seg| {
         const base0 = seg * n_points;
         const base1 = (seg + 1) * n_points;
         for (0..n_points) |i| {
@@ -149,16 +185,17 @@ pub fn generateTree(settings: TreeSettings, alloc: std.mem.Allocator) !Tree {
         }
     }
 
-    // Cap: connect each last ring vertex to the cap vertex
-    const last_ring_base = (settings.segments - 1) * n_points;
-    const cap_idx = n_points * settings.segments;
+    // Cap: connect each last ring vertex to the tip vertex
+    const last_ring_base = settings.segments * n_points;
+    const tip_idx = n_points * (settings.segments + 1);
     for (0..n_points) |i| {
         const next = if (i + 1 == n_points) 0 else i + 1;
-        w_indices[idx_pos] = @intCast(last_ring_base + i);
-        idx_pos += 1;
+        // Reverse winding order:
         w_indices[idx_pos] = @intCast(last_ring_base + next);
         idx_pos += 1;
-        w_indices[idx_pos] = @intCast(cap_idx);
+        w_indices[idx_pos] = @intCast(last_ring_base + i);
+        idx_pos += 1;
+        w_indices[idx_pos] = @intCast(tip_idx);
         idx_pos += 1;
     }
 
