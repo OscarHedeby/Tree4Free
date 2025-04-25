@@ -70,12 +70,15 @@ fn packF16To2Bytes(value: f16) [2]u8 {
 pub const TreeProfile = struct {
     height: f32,
     thickness: f32,
-    taper: f32, // 1.0 = no taper, >1.0 = more bulge at base, <1.0 = sharper taper
+    taper: f32, // 1.0 = no taper, >1.0 more bulge at base, <1.0 sharper taper
     segment_height: f32,
 
     /// Returns the number of segments for the given height and segment_height
     fn computeSegments(self: TreeProfile) usize {
-        return @max(2, @as(u32, @intFromFloat(@ceil(self.height / self.segment_height))));
+        return @max(
+            2,
+            @as(u32, @intFromFloat(@ceil(self.height / self.segment_height))),
+        );
     }
 
     /// Returns the TreeSettings for this profile
@@ -128,7 +131,6 @@ pub fn generateTree(profile: TreeProfile, alloc: std.mem.Allocator) !Tree {
         );
         // Tree trunk profile: thick at base, then slims down
         // Cubic ease-out: (1-t)^2 * (1 - 0.5*t) gives a bulge at the base
-        // Instead of converging to 0, lerp to min_radius
         const profile_shape = (1.0 - t) * (1.0 - t) * (1.0 - 0.5 * t);
         const seg_radius = min_radius +
             (base_scale * settings.radius - min_radius) * profile_shape;
@@ -144,8 +146,13 @@ pub fn generateTree(profile: TreeProfile, alloc: std.mem.Allocator) !Tree {
     }
 
     // Add cap ring at the top (not part of segments)
-    const cap_ring_y = @as(f32, @floatFromInt(settings.segments)) * settings.heightStep;
-    try genCircle(ring, min_radius, Vec3f{ 0, cap_ring_y, 0 });
+    const cap_ring_y = @as(f32, @floatFromInt(settings.segments)) *
+        settings.heightStep;
+    try genCircle(ring, min_radius, Vec3f{
+        0,
+        cap_ring_y,
+        0,
+    });
     for (0..n_points) |i| {
         w_verts[settings.segments * n_points + i] = ring[i];
     }
@@ -199,7 +206,11 @@ pub fn generateTree(profile: TreeProfile, alloc: std.mem.Allocator) !Tree {
         idx_pos += 1;
     }
 
-    return Tree{ .alloc = alloc, .verts = w_verts, .indices = w_indices };
+    return Tree{
+        .alloc = alloc,
+        .verts = w_verts,
+        .indices = w_indices,
+    };
 }
 
 const TreeGenError = error{
