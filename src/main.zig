@@ -34,11 +34,11 @@ var old_flags = bgfx.ResetFlags_None;
 var old_size = [2]i32{ WIDTH, HEIGHT };
 
 // Initial Camera state
-const initial_eye_x: f32 = 10.0;
-const initial_eye_y: f32 = 0.0;
+const initial_eye_x: f32 = 30.0;
+const initial_eye_y: f32 = 10.0;
 const initial_eye_z: f32 = 0.0;
 const initial_target_x: f32 = 0.0;
-const initial_target_y: f32 = 0.0;
+const initial_target_y: f32 = initial_eye_y;
 const initial_target_z: f32 = 0.0;
 
 // Camera view direction (fixed)

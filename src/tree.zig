@@ -17,7 +17,6 @@ pub const PosColorVertex = struct {
     nx: f32,
     ny: f32,
     nz: f32,
-    abgr: u32,
 
     pub fn init(
         x: f32,
@@ -26,7 +25,6 @@ pub const PosColorVertex = struct {
         nx: f32,
         ny: f32,
         nz: f32,
-        abgr: u32,
     ) PosColorVertex {
         return .{
             .x = x,
@@ -35,7 +33,6 @@ pub const PosColorVertex = struct {
             .nx = nx,
             .ny = ny,
             .nz = nz,
-            .abgr = abgr,
         };
     }
 
@@ -48,7 +45,6 @@ pub const PosColorVertex = struct {
         L.posColorLayout.begin(bgfx.RendererType.Noop)
             .add(bgfx.Attrib.Position, 3, bgfx.AttribType.Float, false, false)
             .add(bgfx.Attrib.Normal, 3, bgfx.AttribType.Float, true, false)
-            .add(bgfx.Attrib.Color0, 4, bgfx.AttribType.Uint8, true, false)
             .end();
 
         return L.posColorLayout;
@@ -181,7 +177,6 @@ pub fn generateTree(profile: TreeProfile, alloc: std.mem.Allocator) !Tree {
         0,
         1,
         0,
-        0xFFFFFFFF,
     );
     w_verts[n_points * (settings.segments + 1)] = tip_vertex;
 
@@ -243,7 +238,6 @@ pub fn genCircle(
     vector_offset: Vec3f,
 ) TreeGenError!void {
     const angle = 2.0 * std.math.pi / @as(f32, @floatFromInt(verts.len));
-    const center = PosColorVertex.init(0, 0, 0, 0, 0, 0, 0xFFFFFFFF);
 
     var x: f32 = 0;
     var y: f32 = 0;
@@ -267,7 +261,6 @@ pub fn genCircle(
             nx,
             ny,
             nz,
-            center.abgr,
         );
     }
 }
