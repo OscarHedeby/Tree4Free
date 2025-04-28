@@ -8,11 +8,13 @@ const zm = @import("zmath");
 const zbgfx = @import("zbgfx");
 const shaderc = zbgfx.shaderc;
 const bgfx = zbgfx.bgfx;
+const debugdraw = zbgfx.debugdraw;
 
 const backend_glfw_bgfx = @import("backend_glfw_bgfx.zig");
 const shaders = @import("shader_builder.zig");
 
 const TreeGen = @import("tree.zig");
+const Branch = @import("branch.zig");
 
 const MAIN_FONT = @embedFile("Roboto-Medium.ttf");
 
@@ -257,6 +259,19 @@ pub fn main() anyerror!u8 {
         bgfx.StateFlags_WriteZ | bgfx.StateFlags_DepthTestLess |
         bgfx.StateFlags_Msaa | bgfx.StateFlags_CullCw;
 
+    // init debugdraw
+    debugdraw.init();
+    defer debugdraw.deinit();
+
+    var dde = debugdraw.Encoder.create();
+    defer debugdraw.Encoder.destroy(dde);
+
+    var tree_age: i32 = 5;
+    var branch = try Branch.GrowTree(allocator, .{
+        .age = @intCast(tree_age),
+        .seed = 4242,
+    });
+
     //
     // Main loop
     //
@@ -414,6 +429,7 @@ pub fn main() anyerror!u8 {
 
         // Tree Profile Controls
         var tree_changed = false;
+        var branch_change = false;
         if (zgui.begin("Tree Profile", .{})) {
             tree_changed = tree_changed or
                 zgui.sliderFloat("Height", .{
@@ -438,6 +454,12 @@ pub fn main() anyerror!u8 {
                     .v = &tree_segment_height,
                     .min = 0.05,
                     .max = 2.0,
+                });
+            branch_change = branch_change or
+                zgui.sliderInt("Tree Age", .{
+                    .v = &tree_age,
+                    .min = 0,
+                    .max = 10,
                 });
         }
         zgui.end();
@@ -474,6 +496,24 @@ pub fn main() anyerror!u8 {
             );
         }
 
+        // Debugdraw
+        {
+            dde.begin(0, true, null);
+            defer dde.end();
+
+            dde.drawAxis(.{ 0, 0, 0 }, 1.0, .Count, 0.0);
+
+            if (branch_change) {
+                branch = try Branch.GrowTree(
+                    allocator,
+                    .{ .age = @intCast(tree_age), .seed = 4242 },
+                );
+            }
+
+            // Start recursive drawing from the current branch.
+            drawBranch(&branch, dde);
+        }
+
         backend_glfw_bgfx.draw();
 
         // Render Frame
@@ -481,4 +521,33 @@ pub fn main() anyerror!u8 {
     }
 
     return 0;
+}
+
+fn drawBranch(branch: *Branch.Branch, dde: *debugdraw.Encoder) void {
+    const sphere_radius: f32 = 0.5;
+    const cylinder_radius: f32 = 0.5;
+    {
+        dde.push();
+        defer dde.pop();
+        // Draw sphere at the branch's starting point.
+        dde.drawSphere(branch.start, sphere_radius);
+
+        // Draw cylinder from branch.start to end_point.
+        dde.drawCylinder([3]f32{
+            branch.start[0],
+            branch.start[1],
+            branch.start[2],
+        }, [3]f32{
+            branch.end[0],
+            branch.end[1],
+            branch.end[2],
+        }, cylinder_radius);
+    }
+
+    // Recursively draw all child branches.
+    if (branch.children != null) {
+        for (0..branch.children.?.len) |i| {
+            drawBranch(&branch.children.?[i], dde);
+        }
+    }
 }
