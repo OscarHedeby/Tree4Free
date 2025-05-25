@@ -13,7 +13,7 @@ const debugdraw = zbgfx.debugdraw;
 const backend_glfw_bgfx = @import("backend_glfw_bgfx.zig");
 const shaders = @import("shader_builder.zig");
 
-const TreeGen = @import("tree.zig");
+// const TreeGen = @import("tree.zig");
 const Branch = @import("branch.zig");
 
 const MAIN_FONT = @embedFile("Roboto-Medium.ttf");
@@ -106,50 +106,50 @@ pub fn main() anyerror!u8 {
     if (!bgfx.init(&bgfx_init)) std.process.exit(1);
     defer bgfx.shutdown();
 
-    var tree_height: f32 = 20.0;
-    var tree_thickness: f32 = 2.0;
-    var tree_taper: f32 = 1.0;
-    var tree_segment_height: f32 = 0.5;
+    // var tree_height: f32 = 20.0;
+    // var tree_thickness: f32 = 2.0;
+    // var tree_taper: f32 = 1.0;
+    // var tree_segment_height: f32 = 0.5;
 
     var gpa_tree = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa_tree.allocator();
     defer _ = gpa_tree.deinit();
 
-    var tree_profile = TreeGen.TreeProfile{
-        .height = tree_height,
-        .thickness = tree_thickness,
-        .taper = tree_taper,
-        .segment_height = tree_segment_height,
-    };
+    // var tree_profile = TreeGen.TreeProfile{
+    //     .height = tree_height,
+    //     .thickness = tree_thickness,
+    //     .taper = tree_taper,
+    //     .segment_height = tree_segment_height,
+    // };
 
-    var tree = try TreeGen.generateTree(tree_profile, allocator);
-    defer tree.deinit();
+    // var tree = try TreeGen.generateTree(tree_profile, allocator);
+    // defer tree.deinit();
 
     //
     // Create vertex buffer
     //
-    const vertex_layout = TreeGen.PosColorVertex.layoutInit();
-    var vbh = bgfx.createVertexBuffer(
-        bgfx.makeRef(
-            tree.verts.ptr,
-            @intCast(tree.verts.len * @sizeOf(TreeGen.PosColorVertex)),
-        ),
-        &vertex_layout,
-        bgfx.BufferFlags_None,
-    );
-    defer bgfx.destroyVertexBuffer(vbh);
+    // const vertex_layout = TreeGen.PosColorVertex.layoutInit();
+    // var vbh = bgfx.createVertexBuffer(
+    //     bgfx.makeRef(
+    //         tree.verts.ptr,
+    //         @intCast(tree.verts.len * @sizeOf(TreeGen.PosColorVertex)),
+    //     ),
+    //     &vertex_layout,
+    //     bgfx.BufferFlags_None,
+    // );
+    // defer bgfx.destroyVertexBuffer(vbh);
 
     //
     // Create index buffer
     //
-    var ibh = bgfx.createIndexBuffer(
-        bgfx.makeRef(
-            tree.indices.ptr,
-            @intCast(tree.indices.len * @sizeOf(u16)),
-        ),
-        bgfx.BufferFlags_None,
-    );
-    defer bgfx.destroyIndexBuffer(ibh);
+    // var ibh = bgfx.createIndexBuffer(
+    //     bgfx.makeRef(
+    //         tree.indices.ptr,
+    //         @intCast(tree.indices.len * @sizeOf(u16)),
+    //     ),
+    //     bgfx.BufferFlags_None,
+    // );
+    // defer bgfx.destroyIndexBuffer(ibh);
 
     var reset_flags = bgfx.ResetFlags_None;
     if (vsync) {
@@ -267,9 +267,13 @@ pub fn main() anyerror!u8 {
     defer debugdraw.Encoder.destroy(dde);
 
     var tree_age: i32 = 5;
+    var branch_age: f32 = 4;
+    var branch_chaos: f32 = 2;
     var branch = try Branch.GrowTree(allocator, .{
         .age = @intCast(tree_age),
         .seed = 4242,
+        .avg_branching_age = @floatCast(branch_age),
+        .branch_chaos = @floatCast(branch_chaos),
     });
 
     //
@@ -393,8 +397,8 @@ pub fn main() anyerror!u8 {
 
         _ = bgfx.setTransform(&zm.matToArr(modelMtx), 1);
 
-        bgfx.setVertexBuffer(0, vbh, 0, @intCast(tree.verts.len));
-        bgfx.setIndexBuffer(ibh, 0, @intCast(tree.indices.len));
+        // bgfx.setVertexBuffer(0, vbh, 0, @intCast(tree.verts.len));
+        // bgfx.setIndexBuffer(ibh, 0, @intCast(tree.indices.len));
         bgfx.setState(state, 0);
         bgfx.submit(
             0,
@@ -428,73 +432,87 @@ pub fn main() anyerror!u8 {
         zgui.end();
 
         // Tree Profile Controls
-        var tree_changed = false;
+        // var tree_changed = false;
         var branch_change = false;
         if (zgui.begin("Tree Profile", .{})) {
-            tree_changed = tree_changed or
-                zgui.sliderFloat("Height", .{
-                    .v = &tree_height,
-                    .min = 1.0,
-                    .max = 50.0,
-                });
-            tree_changed = tree_changed or
-                zgui.sliderFloat("Thickness", .{
-                    .v = &tree_thickness,
-                    .min = 0.1,
-                    .max = 10.0,
-                });
-            tree_changed = tree_changed or
-                zgui.sliderFloat("Taper", .{
-                    .v = &tree_taper,
-                    .min = 0.5,
-                    .max = 3.0,
-                });
-            tree_changed = tree_changed or
-                zgui.sliderFloat("Segment Height", .{
-                    .v = &tree_segment_height,
-                    .min = 0.05,
-                    .max = 2.0,
-                });
+            // tree_changed = tree_changed or
+            //     zgui.sliderFloat("Height", .{
+            //         .v = &tree_height,
+            //         .min = 1.0,
+            //         .max = 50.0,
+            //     });
+            // tree_changed = tree_changed or
+            //     zgui.sliderFloat("Thickness", .{
+            //         .v = &tree_thickness,
+            //         .min = 0.1,
+            //         .max = 10.0,
+            //     });
+            // tree_changed = tree_changed or
+            //     zgui.sliderFloat("Taper", .{
+            //         .v = &tree_taper,
+            //         .min = 0.5,
+            //         .max = 3.0,
+            //     });
+            // tree_changed = tree_changed or
+            //     zgui.sliderFloat("Segment Height", .{
+            //         .v = &tree_segment_height,
+            //         .min = 0.05,
+            //         .max = 2.0,
+            //     });
             branch_change = branch_change or
                 zgui.sliderInt("Tree Age", .{
                     .v = &tree_age,
                     .min = 0,
+                    .max = 50,
+                });
+
+            branch_change = branch_change or
+                zgui.sliderFloat("Avg branch age", .{
+                    .v = &branch_age,
+                    .min = 1,
+                    .max = 10,
+                });
+
+            branch_change = branch_change or
+                zgui.sliderFloat("Branch age range", .{
+                    .v = &branch_chaos,
+                    .min = 1,
                     .max = 10,
                 });
         }
         zgui.end();
 
         // Regenerate tree mesh if any parameter changed
-        if (tree_changed) {
-            tree.deinit();
-            tree_profile = TreeGen.TreeProfile{
-                .height = tree_height,
-                .thickness = tree_thickness,
-                .taper = tree_taper,
-                .segment_height = tree_segment_height,
-            };
-            tree = try TreeGen.generateTree(tree_profile, allocator);
+        // if (tree_changed) {
+        // tree.deinit();
+        // tree_profile = TreeGen.TreeProfile{
+        //     .height = tree_height,
+        //     .thickness = tree_thickness,
+        //     .taper = tree_taper,
+        //     .segment_height = tree_segment_height,
+        // };
+        // tree = try TreeGen.generateTree(tree_profile, allocator);
 
-            // Re-upload vertex/index buffers
-            bgfx.destroyVertexBuffer(vbh);
-            bgfx.destroyIndexBuffer(ibh);
+        // Re-upload vertex/index buffers
+        // bgfx.destroyVertexBuffer(vbh);
+        // bgfx.destroyIndexBuffer(ibh);
 
-            vbh = bgfx.createVertexBuffer(
-                bgfx.makeRef(
-                    tree.verts.ptr,
-                    @intCast(tree.verts.len * @sizeOf(TreeGen.PosColorVertex)),
-                ),
-                &vertex_layout,
-                bgfx.BufferFlags_None,
-            );
-            ibh = bgfx.createIndexBuffer(
-                bgfx.makeRef(
-                    tree.indices.ptr,
-                    @intCast(tree.indices.len * @sizeOf(u16)),
-                ),
-                bgfx.BufferFlags_None,
-            );
-        }
+        // vbh = bgfx.createVertexBuffer(
+        //     bgfx.makeRef(
+        //         tree.verts.ptr,
+        //         @intCast(tree.verts.len * @sizeOf(TreeGen.PosColorVertex)),
+        //     ),
+        //     &vertex_layout,
+        //     bgfx.BufferFlags_None,
+        // );
+        // ibh = bgfx.createIndexBuffer(
+        //     bgfx.makeRef(
+        //         tree.indices.ptr,
+        //         @intCast(tree.indices.len * @sizeOf(u16)),
+        //     ),
+        //     bgfx.BufferFlags_None,
+        // );
+        // }
 
         // Debugdraw
         {
@@ -506,7 +524,12 @@ pub fn main() anyerror!u8 {
             if (branch_change) {
                 branch = try Branch.GrowTree(
                     allocator,
-                    .{ .age = @intCast(tree_age), .seed = 4242 },
+                    .{
+                        .age = @intCast(tree_age),
+                        .seed = 4242,
+                        .avg_branching_age = @floatCast(branch_age),
+                        .branch_chaos = @floatCast(branch_chaos),
+                    },
                 );
             }
 
